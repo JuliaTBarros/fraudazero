@@ -1,4 +1,5 @@
 # Execução completa: `docker compose up --build -d` (ou `make up`)
+# Portas publicadas só em 127.0.0.1: os serviços não têm autenticação e não devem ficar expostos na rede (ex.: Wi-Fi da faculdade).
 x-app: &app
   build: .  # sem `image:` fixo: 5 serviços gravando a mesma tag em paralelo dá conflito no build
   restart: unless-stopped
@@ -6,7 +7,7 @@ x-app: &app
 services:
   mosquitto:
     image: eclipse-mosquitto:2
-    ports: ["1883:1883"]
+    ports: ["127.0.0.1:1883:1883"]
     volumes:
       - ./docker/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf
     restart: unless-stopped
@@ -17,7 +18,7 @@ services:
       POSTGRES_USER: fraudazero
       POSTGRES_PASSWORD: fraudazero
       POSTGRES_DB: fraudazero
-    ports: ["5433:5432"]
+    ports: ["127.0.0.1:5433:5432"]
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
@@ -38,7 +39,7 @@ services:
       - --backend-store-uri=postgresql://fraudazero:fraudazero@postgres:5432/mlflow
       - --artifacts-destination=/mlflow/artifacts
       - --serve-artifacts
-    ports: ["5001:5000"]
+    ports: ["127.0.0.1:5001:5000"]
     volumes:
       - ./mlruns:/mlflow/artifacts
     depends_on:
@@ -62,7 +63,7 @@ services:
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "false"
       AIRFLOW__WEBSERVER__SECRET_KEY: fraudazero-dev-secret
       MLFLOW_TRACKING_URI: http://mlflow:5000
-    ports: ["8080:8080"]
+    ports: ["127.0.0.1:8080:8080"]
     volumes:
       - ./dags:/opt/airflow/dags
       - ./src:/opt/project/src
@@ -79,7 +80,7 @@ services:
     command: uvicorn api.main:app --host 0.0.0.0 --port 8000
     environment:
       FRAUD_THRESHOLD: ${FRAUD_THRESHOLD:-0.5}
-    ports: ["8000:8000"]
+    ports: ["127.0.0.1:8000:8000"]
     depends_on:
       - mlflow
 
@@ -107,7 +108,7 @@ services:
   dashboard:
     <<: *app
     command: streamlit run app/dashboard.py --server.port=8501 --server.address=0.0.0.0
-    ports: ["8501:8501"]
+    ports: ["127.0.0.1:8501:8501"]
     depends_on:
       postgres:
         condition: service_healthy
