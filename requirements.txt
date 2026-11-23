@@ -1,12 +1,16 @@
 # Dependências dos serviços Python (api, subscriber, simulador, dashboard, mlflow).
-# scikit-learn e imbalanced-learn devem ter a MESMA versão em docker/airflow/requirements.txt.
-# Depois do primeiro build funcionando, congele as versões com `pip freeze` se quiser reprodutibilidade total.
+# O bloco "pilha do modelo" deve ser IDÊNTICO em docker/airflow/requirements.txt:
+# o modelo é treinado no Airflow e desserializado (pickle) na API; versões diferentes = modelo não carrega.
 
-pandas>=2.2
-numpy>=1.26
+# pilha do modelo (versões exatas)
+pandas==2.3.3
+numpy==2.4.6
+scipy==1.17.1
 scikit-learn==1.6.1
 imbalanced-learn==0.13.0
-mlflow>=2.20,<3
+mlflow==2.22.5
+
+# serviços
 optuna>=3.6
 fastapi>=0.115
 uvicorn[standard]>=0.30
