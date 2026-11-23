@@ -1,0 +1,22 @@
+# Dependências dos serviços Python (api, subscriber, simulador, dashboard, mlflow).
+# scikit-learn e imbalanced-learn devem ter a MESMA versão em docker/airflow/requirements.txt.
+# Depois do primeiro build funcionando, congele as versões com `pip freeze` se quiser reprodutibilidade total.
+
+pandas>=2.2
+numpy>=1.26
+scikit-learn==1.6.1
+imbalanced-learn==0.13.0
+mlflow>=2.20,<3
+optuna>=3.6
+fastapi>=0.115
+uvicorn[standard]>=0.30
+pydantic>=2
+paho-mqtt>=2.0
+SQLAlchemy>=2.0,<2.1  # mlflow 2.x quebra com SQLAlchemy 2.1
+psycopg2-binary>=2.9
+streamlit>=1.37
+requests>=2.31
+plotly>=5.20
+
+# desenvolvimento
+pytest>=8

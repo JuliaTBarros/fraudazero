@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# Segredos e configuração local
+.env
+.claude/settings.local.json
+
+# Dados (grandes, vêm do Kaggle)
+data/raw/*
+data/processed/*
+data/stream/*
+!data/*/.gitkeep
+
+# Artefatos do MLflow
+mlruns/*
+!mlruns/.gitkeep
+
+# LaTeX (relatório)
+reports/*.aux
+reports/*.log
+reports/*.out
+reports/*.bbl
+reports/*.blg
+reports/*.fls
+reports/*.fdb_latexmk
+reports/*.synctex.gz
+
+# SO / editores
+.DS_Store
+.idea/
+.vscode/
+
+# Saídas do Playwright MCP (screenshots e snapshots)
+.playwright-mcp/
