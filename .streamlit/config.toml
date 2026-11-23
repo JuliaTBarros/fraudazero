@@ -1,0 +1,38 @@
+# Tema global do dashboard. É a fonte principal do visual: todo componente nativo do
+# Streamlit (texto, métricas, gráficos, tabelas, widgets) segue estas cores.
+# As mesmas cores existem como tokens CSS em app/style.css (convertidas de oklch para hex):
+# se mudar uma, mude a outra.
+
+[theme]
+font = "'DM Sans':https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&display=swap, sans-serif"
+codeFont = "'IBM Plex Mono':https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap, monospace"
+baseRadius = "0.5rem"
+showWidgetBorder = true
+
+[theme.light]
+primaryColor = "#22c55e"               # --primary
+backgroundColor = "#f0f8ff"            # --background
+secondaryBackgroundColor = "#e0f2fe"   # --secondary
+textColor = "#374151"                  # --foreground
+linkColor = "#22c55e"                  # --primary
+borderColor = "#e5e7eb"                # --border
+codeBackgroundColor = "#f3f4f6"        # --muted
+dataframeBorderColor = "#e5e7eb"       # --border
+dataframeHeaderBackgroundColor = "#f3f4f6"  # --muted
+redColor = "#ef4444"                   # --destructive
+greenColor = "#22c55e"                 # --primary
+chartCategoricalColors = ["#22c55e", "#10b981", "#059669", "#047857", "#065f46"]  # --chart-1..5
+
+[theme.dark]
+primaryColor = "#34d399"
+backgroundColor = "#0f172a"
+secondaryBackgroundColor = "#2d3748"
+textColor = "#d1d5db"
+linkColor = "#34d399"
+borderColor = "#4b5563"
+codeBackgroundColor = "#19212e"
+dataframeBorderColor = "#4b5563"
+dataframeHeaderBackgroundColor = "#19212e"
+redColor = "#ef4444"
+greenColor = "#34d399"
+chartCategoricalColors = ["#34d399", "#2dd4bf", "#22c55e", "#10b981", "#059669"]

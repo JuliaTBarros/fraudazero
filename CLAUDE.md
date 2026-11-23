@@ -85,6 +85,7 @@ Endereços locais: Airflow `:8080` (admin/admin) · MLflow `:5001` · API `:8000
 - Commits pequenos, branches curtas por frente (`dados/…`, `infra/…`, `api/…`), PR com revisão de um colega.
 - Notebooks sem saída commitada (`nbstripout`).
 - Formatação com `ruff format` (um hook já roda ao editar arquivos `.py`).
+- Visual do dashboard: tema em `.streamlit/config.toml` e tokens/regras globais em `app/style.css`. Todo componente segue os dois: nada de cor fixa no Python, cards com `st.container(border=True, key="card-...")`, CSS só via classes `.st-key-*`.
 
 ## Definição de pronto
 

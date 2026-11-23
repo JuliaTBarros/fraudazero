@@ -13,3 +13,4 @@ COPY api ./api
 COPY subscriber ./subscriber
 COPY embedded ./embedded
 COPY app ./app
+COPY .streamlit ./.streamlit
