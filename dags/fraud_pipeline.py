@@ -10,10 +10,11 @@ TRAIN = (
     "cd /opt/project && PYTHONPATH=/opt/project /opt/train-venv/bin/python -m src.train"
 )
 
+# @daily: roda sozinha na 1ª subida (catchup=False); retreinar de hora em hora só gasta RAM.
 with DAG(
     dag_id="fraudazero_pipeline",
     start_date=datetime(2026, 1, 1),
-    schedule="@hourly",
+    schedule="@daily",
     catchup=False,
     tags=["fraudazero"],
 ) as dag:

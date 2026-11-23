@@ -6,21 +6,19 @@ Chamado pela DAG `fraudazero_pipeline` (venv /opt/train-venv no contêiner do Ai
 import argparse
 from pathlib import Path
 
+import matplotlib.pyplot as plt
 import mlflow
 import pandas as pd
+from mlflow.exceptions import MlflowException
 from mlflow.tracking import MlflowClient
+from sklearn.base import clone
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import (
-    average_precision_score,
-    f1_score,
-    precision_score,
-    recall_score,
-)
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler
 
+from src import validation
 from src.common import config
-from src.common.schema import FEATURES, TARGET
+from src.common.schema import TARGET
+from src.features import preprocessor
 
 DATA = Path(config.DATA_DIR)
 RAW = DATA / "raw" / "creditcard.csv"
@@ -52,59 +50,108 @@ def prepare():
     print(f"prepare: treino={cut} linhas, stream={len(df) - cut} linhas")
 
 
-def _metrics(y_true, scores, threshold=0.5):
-    pred = scores >= threshold
-    return {
-        "pr_auc": average_precision_score(y_true, scores),
-        "recall": recall_score(y_true, pred),
-        "precision": precision_score(y_true, pred, zero_division=0),
-        "f1": f1_score(y_true, pred),
-    }
+def evaluate_and_log(model, run_name, params, experiment, register=False):
+    """Avalia um Pipeline NÃO treinado do jeito padrão do projeto e registra tudo no MLflow.
+
+    Métricas registradas:
+    - `pr_auc`, `roc_auc`, `recall`, `precision`, `f1`: holdout temporal 80/20 dentro do train.csv (principal)
+    - `train_*`: as mesmas no treino do holdout (comparar com as de validação = diagnóstico de overfitting)
+    - `cv_valid_*_mean/std` e `cv_train_*_mean/std`: stratified k-fold (k=5)
+    Artefatos: matriz de confusão e curva PR (holdout), `cv_folds.csv` e o modelo treinado em todo o train.csv.
+    Use o mesmo `experiment` para todos os modelos de uma comparação (ex.: "comparacao").
+    """
+    X, y = validation.load_train()
+    hold = validation.holdout_temporal(model, X, y)
+    folds = validation.cv_stratified(model, X, y)
+    final = clone(model).fit(X, y)
+
+    mlflow.set_tracking_uri(config.MLFLOW_TRACKING_URI)
+    mlflow.set_experiment(experiment)
+    with mlflow.start_run(run_name=run_name):
+        mlflow.log_params(
+            params
+            | {
+                "validation": "holdout-temporal-80-20 + stratified-kfold-5",
+                "threshold": 0.5,
+                "dedupe": True,
+                "n_train_rows": len(X),
+            }
+        )
+        mlflow.log_metrics(hold["valid"])
+        mlflow.log_metrics({f"train_{m}": v for m, v in hold["train"].items()})
+        mlflow.log_metric("fit_seconds", hold["fit_seconds"])
+        mlflow.log_metrics(validation.summarize_cv(folds))
+        mlflow.log_text(folds.to_csv(index=False), "cv_folds.csv")
+        y_valid, scores = hold["y_valid"], hold["scores_valid"]
+        for name, fig in [
+            ("confusion_matrix.png", validation.plot_confusion(y_valid, scores)),
+            ("pr_curve.png", validation.plot_pr_curve(y_valid, scores, name=run_name)),
+        ]:
+            mlflow.log_figure(fig, name)
+            plt.close(fig)
+        info = mlflow.sklearn.log_model(
+            final,
+            artifact_path="model",
+            registered_model_name=config.MODEL_NAME if register else None,
+            input_example=X.head(2),
+        )
+    pr = folds["valid_pr_auc"]
+    print(f"{run_name} holdout:", {k: round(v, 4) for k, v in hold["valid"].items()})
+    print(f"{run_name} cv-5: pr_auc = {pr.mean():.4f} ± {pr.std():.4f}")
+    return {"holdout": hold, "folds": folds, "model": final, "info": info}
 
 
-def baseline():
-    """Baseline: regressão logística com holdout temporal. Registra o modelo e marca o alias `champion`."""
-    df = pd.read_csv(TRAIN)  # já ordenado por Time
-    cut = int(len(df) * 0.8)
-    train, valid = df.iloc[:cut], df.iloc[cut:]
-
-    model = Pipeline(
+def baseline_model():
+    """Regressão logística com class_weight='balanced' (desbalanceamento tratado no próprio modelo)."""
+    return Pipeline(
         [
-            ("scaler", StandardScaler()),
+            ("prep", preprocessor()),
             ("clf", LogisticRegression(class_weight="balanced", max_iter=1000)),
         ]
     )
-    model.fit(train[FEATURES], train[TARGET])
-    metrics = _metrics(valid[TARGET], model.predict_proba(valid[FEATURES])[:, 1])
 
-    mlflow.set_tracking_uri(config.MLFLOW_TRACKING_URI)
-    mlflow.set_experiment("baseline")
-    with mlflow.start_run(run_name="logreg-baseline"):
-        mlflow.log_params(
-            {
-                "model": "LogisticRegression",
-                "class_weight": "balanced",
-                "split": "holdout-temporal-80-20",
-            }
-        )
-        mlflow.log_metrics(metrics)
-        info = mlflow.sklearn.log_model(
-            model, artifact_path="model", registered_model_name=config.MODEL_NAME
-        )
-    MlflowClient().set_registered_model_alias(
-        config.MODEL_NAME, config.MODEL_ALIAS, info.registered_model_version
+
+def baseline():
+    """Baseline registrado no MLflow. Vira `champion` só se ainda não houver um campeão."""
+    result = evaluate_and_log(
+        baseline_model(),
+        run_name="logreg-baseline",
+        params={
+            "model": "LogisticRegression",
+            "class_weight": "balanced",
+            "max_iter": 1000,
+            "preprocessing": "hour-of-day sin/cos + log1p(Amount) + StandardScaler",
+        },
+        experiment="baseline",
+        register=True,
     )
-    print("baseline:", {k: round(v, 4) for k, v in metrics.items()})
+    _set_champion_if_missing(result["info"].registered_model_version)
+
+
+def _set_champion_if_missing(version):
+    """O baseline só vira `champion` na primeira vez; depois, nunca rebaixa um campeão já escolhido."""
+    client = MlflowClient()
+    try:
+        current = client.get_model_version_by_alias(
+            config.MODEL_NAME, config.MODEL_ALIAS
+        )
+        print(f"alias '{config.MODEL_ALIAS}' mantido na versão {current.version}")
+    except MlflowException:
+        client.set_registered_model_alias(
+            config.MODEL_NAME, config.MODEL_ALIAS, version
+        )
+        print(f"alias '{config.MODEL_ALIAS}' -> versão {version}")
 
 
 def compare():
-    # TODO (Dados e ML): KNN (subamostra), Árvore, Random Forest, AdaBoost e MLP com stratified k-fold;
-    # SMOTE/class_weight dentro do Pipeline; experimento "comparacao" no MLflow.
+    # TODO (A6): para cada modelo, montar um Pipeline e chamar
+    #   evaluate_and_log(model, run_name=..., params=..., experiment="comparacao")
+    # KNN: RandomUnderSampler DENTRO de um imblearn.pipeline.Pipeline (ver docs/CONTEXTO.md, etapa 8).
     raise NotImplementedError("compare: implementar a comparação de modelos")
 
 
 def tune():
-    # TODO (Dados e ML): Optuna ou Random Search no melhor modelo; experimento "otimizacao" no MLflow;
+    # TODO (A7): Optuna ou Random Search no melhor modelo; experimento "otimizacao" no MLflow;
     # registrar o melhor modelo e mover o alias `champion` se superar o atual.
     raise NotImplementedError("tune: implementar a otimização de hiperparâmetros")
 
