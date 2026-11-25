@@ -37,3 +37,6 @@ reports/*.synctex.gz
 
 # Saídas do Playwright MCP (screenshots e snapshots)
 .playwright-mcp/
+
+# Estudos do Optuna (A7), retomáveis; gerados localmente
+data/optuna.db

@@ -1,21 +1,21 @@
-# CONTEXTO — FraudaZero, frente A (base de Dados e ML) + B1
+# CONTEXTO — FraudaZero, frente A (Dados e ML) + B1
 
-Diário de trabalho da branch `dados/base-ml` (etapas 0 a 8 do plano combinado com o Irvin).
+Diário de trabalho da frente A. Sessão 1: etapas 0 a 8 (A1–A5 + B1, já commitadas e mergeadas no PR #1). Sessão 2: revisão, protocolo de avaliação, A6, A7 e A8 (seções "Sessão 2", no fim do arquivo).
 Cada etapa registra: o que foi feito, arquivos, decisões e justificativas, números reais, problemas, pendências e a sugestão de commit.
 
 ## Estado atual
 
-- **Etapas 0 a 8 concluídas e validadas.** Marco M1 atingido: simulador → MQTT → subscriber → API (baseline) → Postgres → dashboard funcionando, DAG verde (4 tarefas), baseline no MLflow como `champion`, smoke test 2/2.
-- **Próximo passo (próxima pessoa):** A6, comparação de modelos. Tudo o que é preciso está na seção [Passagem de bastão](#etapa-8--passagem-de-bastão).
-- **Irvin:** revisar e commitar na ordem da seção [Commits sugeridos](#commits-sugeridos). **Nada foi commitado.** A [verificação final pré-commit](#verificação-final-pré-commit) passou sem precisar corrigir nada.
-- **Cópia de trabalho:** `C:\dev\fraudazero` (branch `dados/base-ml`). A cópia no OneDrive está **obsoleta** (não foi alterada nem apagada).
-- **Atenção nesta máquina:** a porta 8080 está ocupada por outro projeto seu; o Airflow está rodando em **8081** por um override local (ver etapa 2). A stack continua de pé; `make down` para desligar.
+- **Sessão 2 concluída (A6, A7 e A8).** Campeão: **Random Forest otimizada**, `champion` = **versão 6**, limiar **0,468518**. Holdout PR-AUC 0,760 [0,626; 0,873]. **Teste final no stream (uma vez): PR-AUC 0,789 [0,696; 0,872], recall 0,707, precisão 0,964, 2 falsos alarmes.** A API serve a v6 com o limiar, sem mudar o contrato; a DAG não sobrescreve o campeão.
+- **Achado principal para o relatório (S2.4):** o k-fold estratificado embaralhado superestima os modelos flexíveis em 0,03–0,12 de PR-AUC; o 5-fold temporal concorda com o holdout. A A7 otimizou pelo temporal.
+- **Próximo:** A9 (curva de aprendizado) e A10 (`reports/resultados.md`). Pendências das frentes B e C na passagem de bastão (fim do arquivo), incluindo fixar `FRAUD_THRESHOLD=0.468518` no compose.
+- **Irvin:** nada foi commitado. Verificações pré-commit na S2.8 (dados do campeão, experimentos do MLflow, ponto de operação com recall ≥ 0,80, reprodutibilidade). Commits sugeridos #7 a #13 na tabela abaixo. `docs/PAUSA.md` e `data/optuna.db` não entram.
+- **Atenção nesta máquina:** a porta 8080 continua ocupada por outro projeto seu; o Airflow roda em **8081** por um override local, fora do repositório. A API está rodando com `FRAUD_THRESHOLD=0.468518` passado pelo shell; um `make up` comum volta para 0,5 até a frente B mudar o padrão.
 
 ---
 
 ## Commits sugeridos
 
-Na ordem abaixo, cada commit fica consistente sozinho (o código de um não depende de arquivos de commits posteriores).
+Os commits 1 a 6 (sessão 1) **já estão feitos**: foram juntados no commit `b4d4794` e mergeados em `main` pelo PR #1. Os da sessão 2 começam no #7.
 
 | # | Mensagem | Arquivos |
 |---|---|---|
@@ -25,6 +25,15 @@ Na ordem abaixo, cada commit fica consistente sozinho (o código de um não depe
 | 4 | `Adiciona a EDA do bootstrap dataset com 7 visualizações interpretadas` | `notebooks/01_eda.ipynb`, `reports/figs/eda_01_classes.png` … `reports/figs/eda_07_pca.png` (7) |
 | 5 | `Adiciona a validação do baseline: holdout temporal, k-fold, estabilidade e LOO` | `notebooks/02_experimentos.ipynb`, `reports/figs/val_01_baseline_pr_holdout.png`, `reports/figs/val_02_baseline_confusao_holdout.png`, `reports/figs/val_03_baseline_estabilidade_folds.png` |
 | 6 | `Documenta decisões, resultados e passagem de bastão da base de ML` | `docs/CONTEXTO.md` |
+| 7 | `Formata o notebook de EDA com ruff` | `notebooks/01_eda.ipynb` (só formatação; a do notebook 02 vai junto no #8, mesmo arquivo) |
+| 8 | `Separa desenvolvimento e holdout temporal e adiciona validação temporal e IC por bootstrap` | `src/validation.py`, `notebooks/02_experimentos.ipynb`, `reports/figs/val_03_baseline_estabilidade_folds.png` |
+| 9 | `Implementa a comparação, a otimização, o campeão e o teste final no stream (compare, diagnose, tune, final, stream_test)` | `src/train.py` (depende do #8), `.gitignore` (`data/optuna.db`) |
+| 10 | `Adiciona o notebook 03 de comparação de modelos com análise crítica` | `notebooks/03_comparacao.ipynb`, `scripts/build_nb03.py`, `scripts/nb03_texto.json`, `reports/figs/cmp_01_pr_auc.png` … `reports/figs/cmp_07_estratificado_temporal_holdout.png` (7) |
+| 11 | `Registra a otimização de hiperparâmetros da RF e do MLP (A7)` | `reports/figs/opt_random-forest_historico.png`, `opt_random-forest_importancia.png`, `opt_mlp-smote_historico.png`, `opt_mlp-smote_importancia.png` |
+| 12 | `Escolhe a Random Forest otimizada como campeã com limiar 0,468518 (A8)` | `src/best_params.json`, `scripts/a8_campeao.py`, `reports/figs/a8_01_limiar.png`, `a8_02_confusao_antes_depois.png`, `a8_stream_confusion_matrix.png`, `a8_stream_pr_curve.png` |
+| 13 | `Documenta a sessão 2 da frente A (protocolo, diagnóstico, A6, A7, A8)` | `docs/CONTEXTO.md` (por último) |
+
+Não commitar: `docs/PAUSA.md` (resumo de emergência da queda de energia, já incorporado aqui; pode ser apagado) e `data/optuna.db` (já está no `.gitignore`).
 
 Os notebooks estão salvos **sem saídas** (o filtro `nbstripout` também está ativo no clone). Nenhum dado (`data/`) nem artefato do MLflow (`mlruns/`) entra nos commits; ambos já estão no `.gitignore`.
 
@@ -422,3 +431,448 @@ Total 45.401 (52 fraudes). Classe fraude: **precision 0,0221**, **recall 0,9038*
 
 ### Arquivos alterados nesta verificação
 - `docs/CONTEXTO.md` (esta seção e uma linha no "Estado atual"). Nenhum outro arquivo mudou.
+
+---
+
+# Sessão 2 (24/11/2026)
+
+## S2.1 — Revisão do estado atual
+
+**Git**
+- A sessão começou em `main`, limpa. `dados/base-ml` local = `origin/dados/base-ml` = `b4d4794`, e `main` (`e47b46b`, merge do PR #1) tem o mesmo conteúdo (`git diff` vazio).
+- **Commits sugeridos 1 a 6: todos feitos**, juntados num único commit (`b4d4794`, 19 arquivos, exatamente os da tabela). **Nada pendente** no working tree no início da sessão.
+- Troquei para `dados/base-ml` (pedido do Irvin). Como ela já foi mergeada, sugiro criar uma branch nova antes de commitar a sessão 2 (ex.: `git switch -c dados/modelos`); o working tree acompanha a troca.
+
+**Stack**
+- Docker Desktop estava desligado; iniciado. Os contêineres voltaram sozinhos (`restart: unless-stopped`).
+- **Porta 8080 continua ocupada** por `avaliacao-pratica-release-app-1` (outro projeto). Mesma solução da sessão 1: override `compose.local.yml` (Airflow em `127.0.0.1:8081`), recriado **fora do repositório**, na pasta temporária da sessão. Subida com `docker compose -f docker-compose.yml -f <override> up --build -d`: os 8 serviços de pé.
+- DAG disparada manualmente: `ingest`, `prepare`, `baseline` e `reload_api` com **sucesso** (~1 min).
+- `GET /health` → `{"status":"ok","model_loaded":true}`. MLflow, dashboard e Airflow respondem (HTTP 200). `fraudazero@champion` = **versão 1** (run `4df0683d…`, baseline). As versões 3 e 4 vieram das execuções da DAG (diária automática e manual) e **não moveram o alias**, como esperado.
+- Smoke test: **2 passed**.
+
+**Ruff (0.17.6)**
+- `ruff format --check`: os dois notebooks da frente A estavam fora do formato (o ruff passou a formatar `.ipynb`). **Corrigido** com `ruff format notebooks` (só código das células; nenhuma lógica mudou). Agora 27/27 arquivos formatados.
+- `ruff check src notebooks dags tests`: limpo. O `ruff check .` acusa 11 avisos (`BLE001` exceção genérica, `S110`, `I001`), **todos fora da frente A** (`api/`, `app/`, `embedded/`, `subscriber/`, `.claude/hooks/`). Não mexi; registrados como pendência.
+
+**Problema encontrado (frente B, não corrigido): sem transações novas depois de reiniciar o simulador**
+- Depois do rebuild, nenhuma linha nova entrou em `transactions` (última às 15:14:50, antes do rebuild; 45.895 linhas no total).
+- Causa confirmada com `mosquitto_sub`: o simulador recomeça em `tx-0-0`, ids que já existem no banco, e o `INSERT ... ON CONFLICT (tx_id) DO NOTHING` do subscriber descarta todos. **Com 0,5 s por transação, o dashboard fica sem dados novos por ~6 horas** depois de qualquer reinício do simulador. É a pendência B3 da etapa 2, com efeito maior do que o registrado antes. **Afeta a demo.**
+- Sugestão para a frente B: incluir no `tx_id` um identificador da execução (ex.: `tx-<timestamp de início>-<volta>-<i>`). Paliativo sem mudar código: `make reset` (apaga o banco). Não executei (destrutivo).
+
+**M1:** nada quebrado. A frente A segue.
+
+**Arquivos alterados:** `notebooks/01_eda.ipynb`, `notebooks/02_experimentos.ipynb` (formatação), `docs/CONTEXTO.md`.
+
+---
+
+## S2.2 — Protocolo de avaliação (antes de qualquer modelo novo)
+
+**Problema corrigido:** na sessão 1, o 5-fold do baseline usava o `train.csv` inteiro, **incluindo o trecho do holdout temporal**. Enquanto só havia um modelo, isso não era vazamento. Agora há seleção de modelo, de hiperparâmetros e de limiar: se o holdout entrasse nos folds, a otimização veria o holdout, e a comparação nele deixaria de ser independente.
+
+**Protocolo (três conjuntos, um papel cada)**
+
+| Conjunto | Linhas (fraudes) | `Time` (s) | Papel |
+|---|---|---|---|
+| **Desenvolvimento** = primeiros 80% do `train.csv` | 181.604 (347) | 0 – 125.328 | Stratified 5-fold (69 ou 70 fraudes por fold) e **toda** otimização de hiperparâmetros |
+| **Holdout temporal** = últimos 20% do `train.csv` | 45.401 (52) | 125.329 – 145.247 | Comparar modelos e escolher o campeão e o limiar. Modelos treinados no desenvolvimento |
+| **`stream.csv`** | 56.962 (75) | 145.248 – 172.792 | Teste final, **uma vez**, só no campeão, no fim da A8 |
+
+O modelo que vai para produção é retreinado em desenvolvimento + holdout (todo o `train.csv`), com hiperparâmetros e limiar já fixados.
+
+**Concordo com o protocolo proposto**, com uma observação para o relatório: o holdout é usado para várias decisões (modelo, limiar), então o número dele fica levemente otimista para o campeão. É exatamente por isso que o `stream.csv` fica intocado até o fim: ele é a estimativa sem viés de seleção. Outra limitação: o holdout tem só 52 fraudes, então uma fraude a mais ou a menos detectada muda o recall em ~2 pontos.
+
+**Implementação**
+- [src/validation.py](../src/validation.py): `DEV_FRACTION = 0.8` e `split_dev_holdout(X, y)`; `holdout_temporal` usa esse corte (o comportamento não mudou) e agora mede também `predict_seconds` (pontuar o holdout) e devolve o modelo treinado. `cv_stratified` avisa na docstring que recebe só o desenvolvimento.
+- [src/train.py](../src/train.py) `evaluate_and_log`: o 5-fold roda em `X_dev, y_dev`. Novas métricas `predict_seconds` e `predict_ms_per_1k`; novos parâmetros `validation = dev-stratified-kfold-5 + holdout-temporal-20` e `n_dev_rows`; novo artefato `holdout_scores.csv` (rótulo e score de cada linha do holdout; o notebook da A6 usa para as curvas PR sobrepostas).
+- [notebooks/02_experimentos.ipynb](../notebooks/02_experimentos.ipynb): seção 3 usa o desenvolvimento, textos das seções 3, 4 e 5 atualizados com os números novos, seção 6 vira a descrição do protocolo. Executado do zero (`nbconvert --execute`): sem erros. `val_01` e `val_02` saíram idênticas; `val_03` foi regenerada.
+
+**Baseline reexecutado no protocolo novo** (run `3f7332491d774f18b8ca78fd2a63014f`, experimento `baseline`, versão 5 do modelo, sem alias; `champion` continua na versão 1)
+
+| Estimativa | Antes (sessão 1) | Depois (protocolo novo) |
+|---|---|---|
+| Holdout temporal, PR-AUC | 0,7330 | **0,7330** (igual: o holdout já treinava só nos primeiros 80%) |
+| Holdout: recall / precisão / F1 (limiar 0,5) | 0,9038 / 0,0221 / 0,0432 | iguais |
+| 5-fold, PR-AUC de validação | 0,7148 ± 0,0657 (`train.csv` inteiro, 79–80 fraudes por fold) | **0,7200 ± 0,0299** (só desenvolvimento, 69–70 fraudes por fold) |
+| 5-fold, PR-AUC de treino | 0,7147 ± 0,0163 | 0,7214 ± 0,0080 |
+| 5-fold, ROC-AUC | 0,9708 ± 0,0090 | 0,9730 ± 0,0108 |
+| 5-fold, recall / precisão / F1 | 0,8947 / 0,0608 / 0,1138 | 0,9021 / 0,0722 / 0,1336 |
+
+Por fold (novo): PR-AUC 0,7224 · 0,6839 · 0,6987 · 0,7353 · 0,7598. Tempo de treino 0,31 s; pontuar as 45.401 linhas do holdout: 0,019 s.
+
+**Leitura:** a média quase não mudou e o desvio caiu à metade. O trecho do holdout é o mais recente e tem menos fraudes (0,11% contra 0,19%); misturado aos folds, ele aumentava a variação entre eles. Com o protocolo novo, **diferenças de PR-AUC da ordem de 0,03 (um desvio) estão dentro do ruído** (antes, ~0,07).
+
+**Outro número que mudou:** a projeção do custo do LOO (notebook 02, seção 5) ficou em 16,2 h nesta execução (0,26 s por treino); o texto agora diz "de 16 a 23 horas, conforme a execução".
+
+**Arquivos alterados:** `src/validation.py`, `src/train.py`, `notebooks/02_experimentos.ipynb`, `reports/figs/val_03_baseline_estabilidade_folds.png`, `docs/CONTEXTO.md`.
+
+---
+
+## S2.3a — A6 parcial, código novo e interrupção (registro feito na retomada)
+
+**Código novo em [src/train.py](../src/train.py)** (todos com `random_state=42` onde há aleatoriedade):
+
+| Função / comando | O que faz | Estado |
+|---|---|---|
+| `candidate_models()` | Os modelos da A6 com hiperparâmetros padrão razoáveis (ver tabela abaixo) | Usado |
+| `compare [nomes]` | `evaluate_and_log` de cada modelo no experimento `comparacao` (uma run por modelo; sem registrar versão nem mexer no `champion`) | Executado para 7 das 9 variantes |
+| `tune [nomes]` | Optuna TPE (config da A6 como trial 0, via `enqueue_trial`) maximizando a PR-AUC média do 5-fold no desenvolvimento; no `random-forest`, também Random Search (mesmo espaço, mesmos folds, mesmo orçamento). Experimento `otimizacao` (uma run por estratégia e trials como runs-filhas), figuras `reports/figs/opt_*`, melhor config avaliada com `evaluate_and_log` e gravada em `src/best_params.json` | Testado (3 trials, MLflow temporário); execução real interrompida |
+| `final` | Retreina o campeão de `src/best_params.json` em todo o `train.csv`, registra a versão, grava a tag `threshold` e move o `champion` | **Não executado** |
+| `stream_test` | Teste único no `stream.csv` com o `champion` e o seu limiar; métricas `stream_*` na run do campeão | **Não executado** |
+| `validation.choose_threshold` | Limiar que maximiza o F1 no holdout | Não usado ainda |
+| `validation.PLOT_STYLE` | Estilo único das figuras (o mesmo dos notebooks), aplicado na importação | Usado |
+
+**Modelos e tratamento do desbalanceamento**
+
+| Run | Modelo (padrão) | Desbalanceamento |
+|---|---|---|
+| `logreg` | LogisticRegression(max_iter=1000) | `class_weight="balanced"` |
+| `decision-tree` | DecisionTree(max_depth=10, min_samples_leaf=20) | `class_weight="balanced"` |
+| `random-forest` | RandomForest(200 árvores, max_features="sqrt") | `class_weight="balanced"` |
+| `adaboost` / `adaboost-smote` | AdaBoost(200 stumps, learning_rate=0.5) | nenhum / SMOTE(0,1) |
+| `mlp` / `mlp-smote` | MLP(64, 32), alpha=1e-4, max_iter=50 | nenhum / SMOTE(0,1) |
+| `knn-under` / `knn-under-smote` | KNN(k=15, weights="distance") | RandomUnderSampler(0,02) / + SMOTE(0,1) |
+
+- **SMOTE(0,1)**: as fraudes sintéticas sobem até 10% das legítimas (1:10), só no treino de cada fold (passo do `imblearn.Pipeline`, depois da padronização, porque o SMOTE usa distâncias). Balancear até 1:1 criaria ~500 pontos sintéticos por fraude real (interpolação demais a partir de ~280 fraudes) e dobraria o custo de treino.
+- **KNN, subamostra 0,02**: todas as fraudes do treino do fold + legítimas sorteadas na razão 1:50 (~14 mil linhas em vez de ~145 mil). O KNN compara cada transação com todo o treino na predição; com a subamostra, o custo cai ~10 vezes, e 50 legítimas por fraude ainda representam a variedade das legítimas. A validação mantém a proporção real.
+
+**Probe de custo** (um treino no fold 1 do desenvolvimento; só tempos e a PR-AUC desse fold, sem tocar no holdout):
+
+| Modelo | Treino (s) | Predição (s) | PR-AUC fold 1 |
+|---|---|---|---|
+| logreg | 0,3 | 0,02 | 0,7224 |
+| decision-tree | 4,0 | 0,02 | 0,7581 |
+| random-forest | 9,5 | 0,14 | 0,8499 |
+| adaboost (sem tratamento) | **1.006,3** | 0,50 | 0,8108 |
+| adaboost-smote | 137,2 | 0,50 | 0,8138 |
+| mlp | 10,1 | 0,03 | 0,8515 |
+| mlp-smote | 10,2 | 0,03 | 0,8501 |
+| knn-under | 0,1 | 0,25 | 0,8138 |
+| knn-under-smote | 0,1 | 0,26 | 0,7795 |
+
+O AdaBoost sem tratamento foi ~7 vezes mais lento que com SMOTE, mesmo treinando em menos linhas. Hipótese: sem reamostragem, os pesos das ~227 mil legítimas fáceis encolhem a cada rodada até virar números subnormais, e a aritmética com subnormais é muito mais lenta. Como seriam ~2 h para as 7 execuções do protocolo, essa variante será substituída (S2.5).
+
+**A6 parcial** (experimento `comparacao`; 5-fold no desenvolvimento; holdout no limiar 0,5)
+
+| Run | 5-fold PR-AUC | Holdout PR-AUC | ROC-AUC | Recall | Precisão | F1 | Treino (s) | Predição do holdout (s) |
+|---|---|---|---|---|---|---|---|---|
+| random-forest | 0,8541 ± 0,0122 | **0,7589** | 0,9273 | 0,6731 | 0,9459 | 0,7865 | 15,0 | 0,087 |
+| mlp-smote | 0,8496 ± 0,0118 | 0,7069 | 0,9299 | 0,7308 | 0,5846 | 0,6496 | 15,0 | 0,075 |
+| mlp | 0,8431 ± 0,0191 | 0,7194 | 0,9120 | 0,7308 | 0,6032 | 0,6609 | 11,8 | 0,030 |
+| knn-under | 0,7556 ± 0,0558 | 0,7161 | 0,9114 | 0,7308 | 0,6667 | 0,6972 | 0,2 | 1,209 |
+| decision-tree | 0,7549 ± 0,0268 | 0,6915 | 0,8932 | 0,7885 | 0,0940 | 0,1680 | 5,3 | 0,018 |
+| knn-under-smote | 0,7323 ± 0,0466 | 0,6047 | 0,9186 | 0,8077 | 0,2320 | 0,3605 | 1,0 | 1,657 |
+| logreg (baseline) | 0,7200 ± 0,0299 | 0,7330 | 0,9742 | 0,9038 | 0,0221 | 0,0432 | 0,3 | 0,017 |
+| adaboost-smote | interrompido | | | | | | | |
+| adaboost | interrompido (será substituído) | | | | | | | |
+
+Tempos medidos com 3 a 4 processos disputando a CPU; servem para ordem de grandeza.
+
+**Interrupção (queda de energia)**
+- Antes da queda, os 4 processos em segundo plano foram parados a pedido do Irvin (`Stop-Process`): `tune random-forest` (TPE + Random Search), `tune mlp-smote`, `compare adaboost-smote` e `compare adaboost`.
+- **Progresso perdido:** os estudos do Optuna ficavam em memória e só gravavam no MLflow no fim, e o `compare` só cria a run depois de treinar tudo. Por isso nenhum trial nem fold desses 4 processos foi salvo. Lição para a retomada: rodar o `tune` com saída sem buffer e salvar os trials à medida que terminam.
+- **MLflow na retomada:** nenhuma run RUNNING ou FAILED. As 7 runs de `comparacao` estão FINISHED, e o experimento `otimizacao` não chegou a ser criado. **Nada precisou ser apagado.**
+- O script que monta o notebook 03 foi movido do scratchpad para [scripts/build_nb03.py](../scripts/build_nb03.py). O `docs/PAUSA.md` foi o resumo de emergência; este registro o substitui.
+
+**Arquivos alterados:** `src/train.py`, `src/validation.py`, `scripts/build_nb03.py` (novo), `docs/CONTEXTO.md`, `docs/PAUSA.md` (novo; pode ser descartado).
+
+---
+
+## Nota para a frente B — simulador reiniciado não gera dados novos (para repassar)
+
+**Problema:** o simulador numera as mensagens como `tx-<volta>-<linha>` e recomeça em `tx-0-0` sempre que o contêiner reinicia (rebuild, `make up`, queda). O subscriber grava com `INSERT ... ON CONFLICT (tx_id) DO NOTHING`, então todos os ids já existentes no banco são descartados em silêncio. Com 0,5 s por transação e ~46 mil linhas já gravadas, **o dashboard fica cerca de 6 horas sem nenhuma transação nova** depois de um reinício. Isso afeta diretamente a demo. Confirmado na sessão 2 com `mosquitto_sub` (o simulador publica `tx-0-294`, que já está no banco).
+
+**Correção sugerida (uma linha em `embedded/simulator.py`):** incluir no `tx_id` um identificador da execução, por exemplo `run = int(time.time())` no início e `tx_id = f"tx-{run}-{lap}-{i}"`. O contrato MQTT não muda (`tx_id` continua sendo uma string única).
+**Paliativo sem mudar código:** `make reset` antes da demo (apaga o banco).
+
+---
+
+## S2.4 — Por que o 5-fold estratificado e o holdout discordam (Etapa 1)
+
+**Pergunta:** no baseline, o 5-fold e o holdout são parecidos (0,720 e 0,733), mas na RF e no MLP o 5-fold fica perto de 0,85 e o holdout cai para 0,71–0,76. **Hipótese (Irvin):** o k-fold embaralhado mistura transações de momentos diferentes; modelos flexíveis aprendem padrões de fraudes correlacionadas no tempo (rajadas, como na Fig. 3 da EDA), que aparecem dos dois lados do corte. O holdout temporal impede isso.
+
+**O que foi feito**
+- [src/validation.py](../src/validation.py): `cv_temporal` (`TimeSeriesSplit`, 5 splits no desenvolvimento, janela crescente: treino de 30 mil a 151 mil linhas, validação de 30.267 linhas no bloco seguinte, com 66, 48, 33, 65 e 38 fraudes) e `bootstrap_ci` (IC 95% da PR-AUC por bootstrap das linhas do holdout, 1.000 reamostragens, `random_state=42`). O código de CV foi fatorado em `_cv`, compartilhado pelas duas validações.
+- [src/train.py](../src/train.py): o `evaluate_and_log` agora registra também `cv_temporal_*` (média e desvio por métrica), `cv_temporal_folds.csv`, `pr_auc_ci_low` e `pr_auc_ci_high`. O novo comando `diagnose` acrescentou essas métricas **às 7 runs já existentes** de `comparacao` (mesma configuração; nada foi retreinado nem duplicado no estratificado).
+
+**Resultados** (PR-AUC; holdout com IC 95%; treino = média da PR-AUC no treino de cada fold)
+
+| Modelo | Stratified 5-fold | Temporal 5-fold | Holdout [IC 95%] | Estrat. − temporal | Treino (estrat. / temporal) |
+|---|---|---|---|---|---|
+| random-forest | 0,8541 ± 0,0122 | 0,7741 ± 0,1225 | **0,7589** [0,619; 0,870] | +0,080 | 1,000 / 1,000 |
+| logreg (baseline) | 0,7200 ± 0,0299 | 0,7160 ± 0,1426 | 0,7330 [0,601; 0,839] | **+0,004** | 0,721 / 0,686 |
+| mlp | 0,8431 ± 0,0191 | 0,7546 ± 0,1141 | 0,7194 [0,577; 0,833] | +0,089 | 0,993 / 0,999 |
+| knn-under | 0,7556 ± 0,0558 | 0,7091 ± 0,1149 | 0,7161 [0,575; 0,836] | +0,047 | 0,923 / 0,962 |
+| mlp-smote | 0,8496 ± 0,0118 | 0,7313 ± 0,0723 | 0,7069 [0,565; 0,821] | +0,118 | 1,000 / 1,000 |
+| decision-tree | 0,7549 ± 0,0268 | 0,6592 ± 0,1033 | 0,6915 [0,549; 0,825] | +0,096 | 0,878 / 0,867 |
+| knn-under-smote | 0,7323 ± 0,0466 | 0,6450 ± 0,1405 | 0,6047 [0,449; 0,746] | +0,087 | 0,890 / 0,929 |
+
+PR-AUC por split temporal: logreg 0,706 · 0,708 · 0,492 · 0,807 · 0,867; RF 0,824 · 0,883 · 0,564 · 0,808 · 0,791; MLP 0,845 · 0,846 · 0,590 · 0,682 · 0,810. O split 3 (`Time` 63.322–76.231 s, 33 fraudes) é o mais difícil para todos.
+
+**Diferenças pareadas no holdout** (as mesmas 1.000 reamostragens para os dois modelos; IC 95% da diferença)
+
+| Comparação | Diferença | IC 95% | P(1º > 2º) |
+|---|---|---|---|
+| RF − logreg | +0,027 | [−0,028; +0,085] | 0,83 |
+| RF − mlp | +0,040 | [−0,022; +0,105] | 0,90 |
+| RF − knn-under | +0,043 | [−0,007; +0,097] | 0,95 |
+| RF − mlp-smote | +0,053 | [−0,011; +0,126] | 0,94 |
+| RF − decision-tree | +0,066 | [+0,007; +0,131] | 0,98 |
+| RF − knn-under-smote | +0,153 | [+0,061; +0,245] | 1,00 |
+| logreg − knn-under-smote | +0,127 | [+0,040; +0,224] | 1,00 |
+
+**Conclusões (texto para a análise crítica e o relatório)**
+1. **A hipótese se confirma.** Em todos os modelos flexíveis, o 5-fold estratificado supera o temporal em +0,05 a +0,12, e o temporal fica perto do holdout (diferença ≤ 0,04 em todos, exceto a árvore). No modelo linear, as três estimativas coincidem (0,720 / 0,716 / 0,733). O viés está no **embaralhamento**, e ele cresce com a capacidade do modelo.
+2. **Mecanismo:** RF e MLP chegam a PR-AUC de treino ~1,0, ou seja, memorizam as fraudes do treino. Fraudes vêm em rajadas próximas no tempo (EDA, Fig. 3); no k-fold embaralhado, fraudes "irmãs" caem no treino e na validação, e a memorização vira acerto. No corte temporal, as fraudes da validação são de outro momento, e a vantagem some. A logística, que não consegue memorizar (treino 0,72), não ganha nada com o embaralhamento.
+3. **O 5-fold estratificado superestima o desempenho futuro dos modelos flexíveis em ~0,08–0,12 de PR-AUC.** Ele continua útil para medir **estabilidade** (desvio baixo, ~0,01–0,03), mas não para estimar o desempenho em produção nem para ordenar modelos de capacidades diferentes.
+4. **O holdout tem pouco poder estatístico:** com 52 fraudes, o IC 95% de cada modelo tem ~±0,13 de largura. A RF tem o melhor holdout, mas **a vantagem sobre a logística, o MLP e o KNN não é significativa** (os ICs pareados incluem o zero). Só são significativamente piores que a RF: Árvore, KNN com SMOTE e AdaBoost balanceado.
+5. **A CV temporal também é ruidosa** (desvio de ~0,07–0,14), porque cada bloco tem só 33–66 fraudes e os blocos diferem entre si (o split 3 é difícil para todos). Nenhuma estimativa isolada é confiável; o relatório deve mostrar as três e o IC.
+
+**Consequência para a A7 (decisão):** a otimização **não chegou a ser concluída** (nenhum trial foi salvo antes da queda), então não há configuração superajustada a refazer. Ao reiniciar, o objetivo da otimização passa a ser a **PR-AUC média da CV temporal no desenvolvimento** (`TUNE_CV = "temporal"` em `src/train.py`), e não a do estratificado. Motivo: o estratificado premia justamente a memorização (por exemplo, folhas de 1 amostra na RF), que não se sustenta no futuro. Custo: o objetivo temporal é mais ruidoso, e o TPE pode perseguir ruído; por isso a melhor configuração é sempre conferida no holdout contra a padrão, e o ganho reportado é o do holdout.
+
+**Arquivos alterados:** `src/validation.py`, `src/train.py`, `docs/CONTEXTO.md`.
+
+---
+
+## S2.5 — A6 completa: comparação de modelos
+
+**AdaBoost (Etapa 2.1)**
+- A variante "sem tratamento" foi **substituída** por `adaboost-balanced`: AdaBoost com estimador base `DecisionTreeClassifier(max_depth=1, class_weight="balanced", random_state=42)`, 200 estimadores, `learning_rate=0.5`.
+- **Ela degenera:** o boosting para com **3 estimadores**. O stump balanceado otimiza o erro ponderado por classe e marca fraude em excesso. Medido com os pesos do AdaBoost, o erro sobe de 0,027 → 0,096 → 0,318 e chega a 1,0 na 4ª rodada. O SAMME exige erro < 0,5 e encerra. PR-AUC: 0,276 (estratificado), 0,390 (temporal), 0,096 (holdout). Conclusão para o relatório: **`class_weight` no estimador base conflita com a reponderação do AdaBoost**; para AdaBoost, o desbalanceamento deve ser tratado por reamostragem (SMOTE) ou pelos pesos iniciais do `fit`.
+- `adaboost-smote` foi reexecutado do zero (tinha morrido na queda). Treino de ~199 s no desenvolvimento com a CPU disputada (137 s isolado no probe): **nenhum treino passou de 10 min**, então a subamostra não foi necessária. O processo levou ~55 min de relógio porque recebeu menos de um núcleo (a otimização da RF ocupava ~15 dos 20).
+
+**Tabela final da A6** (experimento `comparacao`; holdout no limiar 0,5; tempos medidos com processos concorrentes, valem como ordem de grandeza)
+
+| Run | Estratificado 5-fold | Temporal 5-fold | Holdout [IC 95%] | Recall | Precisão | F1 | ROC-AUC | Treino (s) | Predição (ms / mil tx) |
+|---|---|---|---|---|---|---|---|---|---|
+| **random-forest** | 0,8541 ± 0,0122 | **0,7741 ± 0,1225** | **0,7589** [0,619; 0,870] | 0,6731 | 0,9459 | 0,7865 | 0,9273 | 15,0 | 1,9 |
+| logreg (baseline) | 0,7200 ± 0,0299 | 0,7160 ± 0,1426 | 0,7330 [0,601; 0,839] | 0,9038 | 0,0221 | 0,0432 | 0,9742 | 0,3 | 0,4 |
+| mlp | 0,8431 ± 0,0191 | 0,7546 ± 0,1141 | 0,7194 [0,577; 0,833] | 0,7308 | 0,6032 | 0,6609 | 0,9120 | 11,8 | 0,7 |
+| knn-under | 0,7556 ± 0,0558 | 0,7091 ± 0,1149 | 0,7161 [0,575; 0,836] | 0,7308 | 0,6667 | 0,6972 | 0,9114 | 0,2 | 26,6 |
+| mlp-smote | 0,8496 ± 0,0118 | 0,7313 ± 0,0723 | 0,7069 [0,565; 0,821] | 0,7308 | 0,5846 | 0,6496 | 0,9299 | 15,0 | 1,7 |
+| adaboost-smote | 0,8014 ± 0,0188 | 0,7714 ± 0,0971 | 0,6962 [0,572; 0,808] | 0,7885 | 0,2971 | 0,4316 | 0,9741 | 198,6 | 16,6 |
+| decision-tree | 0,7549 ± 0,0268 | 0,6592 ± 0,1033 | 0,6915 [0,549; 0,825] | 0,7885 | 0,0940 | 0,1680 | 0,8932 | 5,3 | 0,4 |
+| knn-under-smote | 0,7323 ± 0,0466 | 0,6450 ± 0,1405 | 0,6047 [0,449; 0,746] | 0,8077 | 0,2320 | 0,3605 | 0,9186 | 1,0 | 36,5 |
+| adaboost-balanced | 0,2757 ± 0,0648 | 0,3903 ± 0,1997 | 0,0960 [0,061; 0,135] | 0,8846 | 0,0178 | 0,0349 | 0,9580 | 3,4 | 0,5 |
+
+Matrizes de confusão no holdout (limiar 0,5; TN, FP, FN, TP): logreg 43.273 / 2.076 / 5 / 47 · RF 45.347 / 2 / 17 / 35 · MLP 45.324 / 25 / 14 / 38 · KNN 45.330 / 19 / 14 / 38 · AdaBoost com SMOTE 45.252 / 97 / 11 / 41 · Árvore 44.954 / 395 / 11 / 41.
+
+**Escolha da variante de desbalanceamento por modelo** (pelo 5-fold **temporal** no desenvolvimento, nunca pelo holdout)
+
+| Modelo | Escolha | Evidência |
+|---|---|---|
+| Logística, Árvore, RF | `class_weight="balanced"` | o modelo aceita; regra do projeto |
+| AdaBoost | **SMOTE(0,1)** | vence o stump balanceado nos 5 splits temporais (0,771 × 0,390); o "sem tratamento" foi descartado por custo (~1.000 s por treino) |
+| MLP | **sem SMOTE** | pelo estratificado o SMOTE parecia ajudar (0,850 × 0,843), mas pelo temporal atrapalha (0,731 × 0,755; vence só 2 de 5 splits). As fraudes sintéticas interpolam fraudes do mesmo período |
+| KNN | **só a subamostra 1:50** | o SMOTE piora nos 5 splits temporais (0,645 × 0,709) |
+
+**Notebook e figuras**
+- [notebooks/03_comparacao.ipynb](../notebooks/03_comparacao.ipynb), gerado por [scripts/build_nb03.py](../scripts/build_nb03.py) com os textos de [scripts/nb03_texto.json](../scripts/nb03_texto.json): `python scripts/build_nb03.py . scripts/nb03_texto.json`. Só **lê** o MLflow (stack de pé). Executado do zero com kernel limpo (`nbconvert --execute`): **0 erros**, 34 células, interpretação abaixo de cada gráfico, salvo sem saídas.
+- Figuras em `reports/figs/`:
+
+| Arquivo | Conteúdo |
+|---|---|
+| `cmp_01_pr_auc.png` | Barras: média ± desvio da PR-AUC no 5-fold estratificado, com o holdout marcado |
+| `cmp_02_folds.png` | PR-AUC por fold, estratificado × temporal (melhor variante de cada família) |
+| `cmp_03_curvas_pr.png` | Curvas PR sobrepostas no holdout (uma por família) |
+| `cmp_04_confusao.png` | Matrizes de confusão no holdout, limiar 0,5 |
+| `cmp_05_treino_validacao.png` | Treino × validação estratificada × validação temporal (overfitting/underfitting) |
+| `cmp_06_custo.png` | Tempo de treino × PR-AUC no holdout |
+| `cmp_07_estratificado_temporal_holdout.png` | **Nova:** as três estimativas por modelo, com desvio e IC 95% |
+
+**Análise crítica (resumo; texto completo no notebook, seção 10)**
+1. A **Random Forest** lidera em todas as estimativas (holdout 0,759; temporal 0,774; estratificado 0,854) e fica entre os 4 primeiros em todos os splits temporais (1º em dois). A vantagem sobre logística, MLP e KNN **não é significativa** no holdout (52 fraudes).
+2. O baseline é competitivo no futuro (holdout 0,733; 1º no split temporal mais recente, 0,867), é o mais barato e não tem overfitting; perde na faixa útil da curva PR (precisão ~0,8 aos 60% de recall, contra ~0,95 da RF).
+3. Todas as curvas PR desabam entre 75% e 80% de recall: 10 a 14 das 52 fraudes recebem score < 0,1 em todos os modelos. É o teto de recall com precisão útil nesta base.
+4. No limiar 0,5, a RF é conservadora (2 falsos alarmes, recall 0,67) e a logística agressiva (2.076 falsos alarmes, recall 0,90). O limiar será escolhido na A8.
+
+**Finalistas da A7:** **Random Forest** e **MLP**. O AdaBoost com SMOTE (2º no temporal, 0,771) ficou de fora por custo (~13 vezes o treino da RF; cada trial seriam ~5 treinos de 1,5 a 3 min) e pelo holdout mais baixo entre os fortes (0,696). A logística não entra (só teria a regularização para ajustar).
+
+**Arquivos alterados:** `src/train.py` (`adaboost-balanced` no lugar de `adaboost`), `scripts/build_nb03.py`, `scripts/nb03_texto.json` (novo), `notebooks/03_comparacao.ipynb` (novo), `reports/figs/cmp_01` a `cmp_07` (novos), `docs/CONTEXTO.md`.
+
+---
+
+## S2.6 — A7: otimização de hiperparâmetros
+
+**Estratégia e justificativa**
+- **Optuna TPE** nos dois finalistas (RF e MLP): o TPE usa os trials anteriores para propor os próximos, o que rende mais por trial quando cada trial é caro (5 treinos). **Random Search** (o `RandomSampler` do Optuna) também na RF, com o **mesmo espaço, os mesmos splits, o mesmo objetivo e o mesmo orçamento** (30 trials), como base de comparação: só o amostrador muda.
+- **Objetivo:** PR-AUC média do **5-fold temporal no desenvolvimento** (S2.4: o estratificado premia memorização). O holdout não é usado na busca; ele só confere a melhor configuração no fim.
+- **O 1º trial de cada estudo é a configuração padrão da A6** (`enqueue_trial`): o ganho é medido nos mesmos splits. Conferido: o trial 0 reproduziu exatamente o temporal da A6 (RF 0,7741; MLP com SMOTE 0,7313).
+- **Detalhe da comparação:** o TPE começa com 10 trials aleatórios, e com a mesma semente (42) eles coincidem com os do Random Search. As duas buscas só divergem a partir do trial 10; a diferença de resultado vem do modelo do TPE.
+- **Robustez:** os trials ficam num SQLite do Optuna (`data/optuna.db`, fora do git). Se o processo cair, o mesmo comando retoma o estudo (lição da queda de energia).
+- **30 trials por estratégia** foi o limite pelo tempo disponível: ~1 a 2 min por trial na RF e ~1,5 min no MLP com a CPU disputada. Duração: TPE da RF 56 min, Random Search da RF 32 min, TPE do MLP 49 min.
+
+**Espaços de busca**
+
+| Modelo | Hiperparâmetro | Espaço | Padrão da A6 |
+|---|---|---|---|
+| RF | `n_estimators` | 100–400, passo 50 | 200 |
+| RF | `max_depth` | {None, 8, 12, 16, 24} | None |
+| RF | `min_samples_leaf` | 1–20 (escala log) | 1 |
+| RF | `max_features` | {"sqrt", 0,3, 0,5} | "sqrt" |
+| RF | `class_weight` | {"balanced", "balanced_subsample", None} | "balanced" |
+| MLP | proporção do SMOTE | 0,01–0,5 (log; 0,01 ≈ quase sem SMOTE) | 0,1 |
+| MLP | `hidden_layer_sizes` | {(32), (64, 32), (128, 64), (128, 64, 32)} | (64, 32) |
+| MLP | `alpha` | 1e-6–1e-2 (log) | 1e-4 |
+| MLP | `learning_rate_init` | 1e-4–1e-2 (log) | 1e-3 |
+| MLP | `batch_size` | {100, 200, 500} | 200 |
+
+**Resultados**
+
+| Modelo | Estratégia | Temporal: padrão → melhor | Melhor configuração | Holdout: padrão → otimizado |
+|---|---|---|---|---|
+| **RF** | **Optuna TPE** | 0,7741 → **0,8009** (+0,027; trial 22) | 400 árvores, `max_depth=24`, `min_samples_leaf=2`, `max_features=0.3`, **`class_weight=None`** | 0,7589 → **0,7601** (+0,001) |
+| RF | Random Search | 0,7741 → 0,7991 (+0,025; trial 22) | 400 árvores, `max_depth=12`, `min_samples_leaf=10`, `max_features="sqrt"`, `class_weight="balanced_subsample"` | (não avaliada: a melhor das duas é a do TPE) |
+| **MLP** | **Optuna TPE** | 0,7313 → **0,7587** (+0,027; trial 22) | (64, 32), `alpha=3,1e-5`, `learning_rate_init=1,4e-4`, `batch_size=500`, SMOTE 0,017 | 0,7069 → **0,7219** (+0,015) |
+
+RF otimizada (run `16177e0b…`, experimento `otimizacao`): holdout 0,7601 [IC 0,626; 0,873], temporal 0,8009 ± 0,1048, estratificado 0,8619 ± 0,0077, ROC-AUC 0,9515 (era 0,9273), recall 0,692 e precisão 0,947 no limiar 0,5, treino de 82 s, 2,8 ms por mil transações.
+MLP otimizado (run `52fb2360…`): holdout 0,7219 [0,580; 0,833], temporal 0,7587 ± 0,0974, estratificado 0,8498 ± 0,0231, recall 0,731 e precisão 0,704 no limiar 0,5.
+
+**Leituras**
+1. **TPE × Random Search (RF):** o melhor valor final é praticamente igual (0,8009 × 0,7991), mas o TPE **explora melhor a região boa**. Nos trials 10–29, quando os dois já divergiram, a média do TPE foi 0,794 e a do Random Search 0,781; o TPE teve 14 trials ≥ 0,795, e o Random Search, 4. Com orçamento pequeno, os dois chegam perto do topo; o TPE chega lá com mais consistência.
+2. **O que importa na RF é o `class_weight`** (importância fANOVA de 0,97). Sem pesos de classe, a média dos trials é 0,797 (19 trials); com `balanced`, 0,773, e com `balanced_subsample`, 0,777. **O `class_weight="balanced"` da A6 atrapalhava a RF:** com ~500 vezes mais peso que uma legítima (razão legítimas/fraudes no treino), cada fraude vira uma região inteira da árvore, e o modelo memoriza fraudes específicas que não se repetem no futuro. O TPE descobriu isso e concentrou 19 dos 30 trials em `None`. Os outros hiperparâmetros quase não importam (≤ 0,02).
+3. **No MLP, o que importa é a taxa de aprendizado** (importância de 0,67): os trials com `learning_rate_init` < 3e-4 têm média de 0,740, contra 0,728 acima disso. Treinar mais devagar reduz a memorização (PR-AUC de treino no temporal de ~1,0 para 0,977). A proporção de SMOTE escolhida (0,017) é praticamente "sem SMOTE", o que confirma a A6.
+4. **O ganho no holdout é pequeno e está dentro do ruído:** RF +0,001, MLP +0,015, contra ganhos de +0,027 no temporal. Parte do ganho na CV é otimismo de seleção (o melhor de 30 trials num objetivo com desvio de ~0,10) e parte não se transfere para o período do holdout. **A otimização melhorou a calibração dos scores** (ROC-AUC da RF de 0,927 para 0,951), **não o ranking no topo**, que é o que a PR-AUC mede.
+5. **Figuras:** `reports/figs/opt_random-forest_historico.png` (TPE × Random Search, melhor até cada trial), `opt_random-forest_importancia.png`, `opt_mlp-smote_historico.png` e `opt_mlp-smote_importancia.png`. Parâmetros em [src/best_params.json](../src/best_params.json).
+
+**Arquivos alterados:** `src/train.py` (`tune` com SQLite, `TUNE_CV`, `_completed`, `_default_value`), `src/best_params.json` (novo), `reports/figs/opt_*.png` (4, novos), `docs/CONTEXTO.md`.
+
+---
+
+## S2.7 — A8: campeão, limiar, teste final e promoção
+
+**Candidatos** (holdout com IC 95%; temporal no desenvolvimento)
+
+| Run | Holdout [IC 95%] | Temporal | Treino (s) |
+|---|---|---|---|
+| **random-forest-tuned** | **0,7601** [0,626; 0,873] | **0,8009 ± 0,1048** | 82 |
+| random-forest (A6) | 0,7589 [0,619; 0,870] | 0,7741 ± 0,1225 | 15 |
+| logreg (baseline) | 0,7330 [0,601; 0,839] | 0,7160 ± 0,1426 | 0,3 |
+| mlp-smote-tuned | 0,7219 [0,580; 0,833] | 0,7587 ± 0,0974 | 39 |
+| mlp (A6) | 0,7194 [0,577; 0,833] | 0,7546 ± 0,1141 | 12 |
+
+**Campeão: Random Forest otimizada** (`random-forest-tuned`: 400 árvores, `max_depth=24`, `min_samples_leaf=2`, `max_features=0.3`, `class_weight=None`).
+Justificativa: (1) maior PR-AUC no holdout (0,760) e (2) maior PR-AUC no temporal (0,801), ou seja, é a melhor nas duas estimativas de desempenho futuro; (3) foi a mais consistente entre os blocos temporais (S2.5); (4) na faixa útil da curva PR, mantém precisão de ~0,95 até ~73% de recall. **Ressalva honesta:** pelos ICs, a vantagem sobre a logística (+0,027) e o MLP não é estatisticamente significativa com 52 fraudes; a escolha se apoia na **consistência** (holdout, temporal e estratificado apontam o mesmo modelo), não num único número. O custo é aceitável: 82 s de treino e 2,8 ms por mil transações.
+
+**Limiar**
+- **Critério:** o limiar que **maximiza o F1 da classe fraude** na curva PR do holdout (`validation.choose_threshold`), calculado com os scores do modelo treinado só no desenvolvimento. Motivo: equilibra fraudes perdidas e falsos alarmes sem depender de um custo arbitrário. Alternativas registradas para o relatório: recall ≥ 0,80 exigiria limiar 0,039, com precisão de 0,31; recall ≥ 0,75, limiar 0,216, com precisão de 0,81.
+- Limiar exato 0,46851786 (F1 0,826). **Valor publicado: `0.468518`** (6 casas; tag `threshold` da versão do modelo e `FRAUD_THRESHOLD`). Com o arredondamento, uma fraude com score exatamente na fronteira fica de fora; **todas as métricas abaixo usam o valor publicado**.
+- **Matriz de confusão no holdout** (52 fraudes, 45.401 linhas), em `reports/figs/a8_02_confusao_antes_depois.png`:
+
+| | TN | FP | FN | TP | Recall | Precisão | F1 |
+|---|---|---|---|---|---|---|---|
+| Antes (limiar 0,5) | 45.347 | 2 | 16 | 36 | 0,692 | 0,947 | 0,800 |
+| Depois (limiar 0,468518) | 45.347 | 2 | 15 | 37 | 0,712 | 0,949 | 0,813 |
+
+  A RF otimizada já tinha scores bem separados; o limiar novo recupera uma fraude sem nenhum falso alarme a mais. A curva (`a8_01_limiar.png`) mostra um platô: entre ~0,22 e ~0,47, o recall fica em ~0,73 e a precisão sobe de 0,81 para 0,95; abaixo de ~0,2, o recall só sobe com perda grande de precisão.
+
+**Treino final e promoção** (`python -m src.train final`)
+- Retreina a RF com os parâmetros de `src/best_params.json` em **todo o `train.csv`** (desenvolvimento + holdout), registra no experimento `campeao` (run `04c8c42009eb4a08b260d7936b09fc4f`), cria a **versão 6** do modelo `fraudazero`, grava a tag `threshold=0.468518` e move **`champion` → versão 6**. Determinístico (`random_state=42`): o holdout reproduziu a PR-AUC da A7 (0,7601).
+
+**Teste final no `stream.csv`** (`python -m src.train stream_test`, **executado uma única vez**, depois de tudo escolhido; métricas `stream_*` na run do campeão; figuras `a8_stream_confusion_matrix.png` e `a8_stream_pr_curve.png`)
+
+| Métrica (stream: 56.962 transações, 75 fraudes) | Valor |
+|---|---|
+| **PR-AUC** | **0,7892** [IC 95% bootstrap: 0,696; 0,872] |
+| ROC-AUC | 0,9737 |
+| Recall | 0,7067 (53 de 75) |
+| Precisão | 0,9636 |
+| F1 | 0,8154 |
+| Matriz (TN, FP, FN, TP) | 56.885 / **2** / 22 / 53 |
+
+Leitura: o número de generalização (0,789) ficou **acima** do holdout (0,760) e dentro do IC dele, sem sinal de degradação no período mais recente. A prevalência do stream (0,13%) fica entre a do holdout (0,11%) e a do desenvolvimento (0,19%). Recall e precisão repetem o padrão do holdout: ~71% das fraudes detectadas, com 2 falsos alarmes em ~57 mil transações. No stream, os limiares 0,5 e 0,468518 dão exatamente o mesmo resultado (nenhum score entre os dois).
+
+**Produção sem mudar o contrato**
+- **API:** `POST /reload` carregou a versão 6. `/health` → `{"status":"ok","model_loaded":true}`. `/predict` com a 1ª fraude do stream → `{"score":0.9333,"is_fraud":true,"threshold":0.468518}`; com a 1ª legítima → `score` 2,0e-6, `is_fraud: false`. Os scores da API são idênticos aos do teste offline (0,93329 e 2,03e-6), e a API confirma `champion` = versão 6.
+- **Limiar na API:** aplicado pela variável `FRAUD_THRESHOLD`, que o contrato já previa. Para a verificação, o contêiner `api` foi recriado com `FRAUD_THRESHOLD=0.468518` no ambiente do shell; **nenhum arquivo do repositório mudou**. **Pendência (frente B):** fixar o valor no repositório trocando o padrão em `docker-compose.yml` (`FRAUD_THRESHOLD: ${FRAUD_THRESHOLD:-0.468518}`) e em `.env.example`. Sem isso, um `make up` do zero volta para 0,5. No stream, isso não muda nenhuma previsão, mas o `threshold` devolvido pela API e o slider do dashboard ficariam com o valor errado.
+- **A DAG não sobrescreve o campeão:** disparada depois da promoção, terminou verde nas 4 tarefas. O log da tarefa `baseline` diz "alias champion mantido na versão 6" (o baseline registra a versão 7 sem alias), e a `reload_api` recarregou a versão 6.
+- Smoke test: 2 passed. Ruff (`src`, `scripts`, `notebooks`, `dags`, `tests`): limpo.
+
+**Arquivos alterados:** `scripts/a8_campeao.py` (novo: candidatos, limiar e figuras), `src/best_params.json` (`champion`, `threshold`), `src/train.py` (`final`, `stream_test`), `src/validation.py` (`choose_threshold`), `reports/figs/a8_01_limiar.png`, `a8_02_confusao_antes_depois.png`, `a8_stream_confusion_matrix.png`, `a8_stream_pr_curve.png` (novos), `.gitignore` (`data/optuna.db`), `docs/CONTEXTO.md`.
+
+
+---
+
+## S2.8 — Verificações antes do commit (sem retreino)
+
+Feitas só com artefatos que já existem no MLflow e no disco. Nenhum modelo foi treinado.
+
+### 1. Com que dados o campeão foi treinado, e onde o limiar foi escolhido
+
+- **Versão 6 (em produção):** treinada em **desenvolvimento + holdout**, ou seja, todo o `train.csv` sem as cópias exatas: **227.005 linhas** (parâmetro `n_train_rows` da run `04c8c420…`; em `evaluate_and_log`, `final = clone(model).fit(X, y)`).
+- **Limiar (0,468518):** escolhido nos scores do holdout de **outro modelo**, com os mesmos hiperparâmetros, treinado **só no desenvolvimento** (181.604 linhas; `holdout_scores.csv` da run `random-forest-tuned`, `16177e0b…`). O `holdout_scores.csv` da run do campeão é idêntico (conferido), porque também vem do modelo de desenvolvimento.
+- **Por que são modelos diferentes:** o holdout não pode escolher o limiar e ao mesmo tempo estar no treino do modelo que o usa (o score seria in-sample). Retreinar com os 20% mais recentes depois de tudo escolhido é a prática padrão: o modelo de produção aprende com o período mais próximo do futuro.
+
+**Por que o limiar continua válido no modelo retreinado**
+1. **Mesma receita, determinística:** os mesmos hiperparâmetros, `random_state=42` e 25% a mais de dados. Na RF, o score é a fração de árvores (folhas com ≥ 2 amostras) que vota fraude, e a escala dessa fração não muda com o tamanho do treino.
+2. **As distribuições de score são equivalentes.** Modelo de desenvolvimento no holdout × versão 6 no stream (as duas são previsões fora da amostra):
+
+| | Dev no holdout | v6 no stream |
+|---|---|---|
+| Legítimas: percentil 99,9 do score | 0,064 | 0,050 |
+| Legítimas com score ≥ limiar | 0,0044% (2) | 0,0035% (2) |
+| Fraudes com score ≥ limiar | 71,2% | 70,7% |
+| Fraudes com score < 0,1 | 21,2% | 21,3% |
+| Mediana do score das fraudes | 0,668 | 0,830 |
+
+   As legítimas continuam concentradas perto de 0, e a fração de fraudes acima do limiar é praticamente a mesma. A v6 dá scores um pouco **mais altos** às fraudes que detecta (mediana 0,83), o que as afasta do limiar.
+3. **O limiar está num platô, não numa fronteira sensível:** no holdout, recall e precisão quase não mudam entre ~0,22 e ~0,5 (`a8_01_limiar.png`). No stream, os limiares 0,468518 e 0,5 dão o mesmo resultado (nenhum score entre os dois), e só 12 das 56.962 transações têm score entre 0,3 e 0,6.
+4. **Confirmação empírica:** no teste único do stream, a v6 com esse limiar repetiu o desempenho do holdout (recall 0,707 × 0,712; precisão 0,964 × 0,949; 2 falsos alarmes nos dois).
+
+**Ressalva:** a comparação acima mistura dois efeitos, o modelo e o período (holdout × stream). Para isolar o efeito do retreino, seria preciso pontuar o stream também com o modelo de desenvolvimento. Esse modelo não foi salvo (o MLflow guarda só o modelo final), então isso exigiria retreiná-lo (~1–2 min, 400 árvores em 181 mil linhas). Não foi feito, por instrução.
+
+### 2. Experimentos do MLflow
+
+| Experimento | Runs | O que contém | Parâmetros, métricas, artefatos, modelo |
+|---|---|---|---|
+| `baseline` | 7 | Regressão logística (`logreg-baseline`). Versões do protocolo: as 4 mais antigas são da sessão 1 (k-fold no `train.csv` inteiro, 33 métricas); a `3f733249` é do protocolo novo (35 métricas); as 2 mais recentes vieram da DAG depois da validação temporal (59 métricas) | Todas com parâmetros, métricas, artefatos (matriz de confusão, curva PR, `cv_folds.csv`; as novas também `holdout_scores.csv` e `cv_temporal_folds.csv`) e **modelo salvo** |
+| `comparacao` | 9 | Uma run por modelo da A6 | Todas com 7–10 parâmetros, 59 métricas, 5 artefatos e **modelo salvo** |
+| `otimizacao` | 95 = 5 de topo + 90 trials | `random-forest-optuna-tpe`, `random-forest-random-search`, `mlp-smote-optuna-tpe` (parâmetros da busca, melhor valor, ganho, `trials.csv`; uma run-filha por trial com parâmetros e métricas) e `random-forest-tuned`, `mlp-smote-tuned` (a melhor configuração no protocolo completo) | As runs `*-tuned` têm parâmetros, 59 métricas, 5 artefatos e **modelo salvo**. As runs de estudo e os trials **não têm modelo** (não faz sentido salvar 90 modelos); o modelo da otimização é o das runs `*-tuned` |
+| `campeao` | 1 | `random-forest-champion`: o `final` da A8 + o teste único no stream | Parâmetros, 69 métricas (incluindo `stream_*`), 8 artefatos e **modelo salvo** = versão 6 registrada |
+| `Default` | 0 | Experimento padrão do MLflow, vazio | — |
+
+Os três experimentos exigidos (baseline, comparação e otimização) existem separados, com parâmetros, métricas, artefatos e modelo salvo. Modelo registrado `fraudazero`: versões 1 a 8. **`champion` = versão 6.** As versões 7 e 8 vieram de execuções da DAG (baseline) depois da promoção e não moveram o alias.
+
+### 3. Segundo ponto de operação no holdout: recall ≥ 0,80 (só registro; produção continua em 0,468518)
+
+**Interpretação:** "o menor limiar com recall ≥ 0,80", tomado ao pé da letra, seria o limiar 0 (tudo vira fraude: recall 1,0 e precisão 0,0011). O ponto útil é o **maior limiar que ainda garante recall ≥ 0,80**, ou seja, o ponto da curva com recall ≥ 0,80 e a melhor precisão possível. É esse que está registrado.
+Mesmo modelo e mesmos scores da escolha do limiar oficial (modelo de desenvolvimento, holdout com 52 fraudes e 45.401 linhas).
+
+| Ponto de operação | Limiar | TN | FP | FN | TP | Recall | Precisão | F1 |
+|---|---|---|---|---|---|---|---|---|
+| **Produção (F1 máximo)** | 0,468518 | 45.347 | 2 | 15 | 37 | 0,7115 | 0,9487 | 0,8132 |
+| **Recall ≥ 0,80** | **0,038875** | 45.254 | **95** | 10 | **42** | **0,8077** | **0,3066** | **0,4444** |
+| Referência: limiar 0,5 | 0,5 | 45.347 | 2 | 16 | 36 | 0,6923 | 0,9474 | 0,8000 |
+
+**Leitura:** subir o recall de 0,71 para 0,81 detecta **5 fraudes a mais** (37 → 42) ao custo de **93 falsos alarmes a mais** (2 → 95): ~19 alertas falsos por fraude adicional, e a precisão cai de 0,95 para 0,31. É o "cotovelo" da curva PR (S2.5: 10 a 14 fraudes têm score muito baixo em todos os modelos). O limiar exato é 0,03887500; logo acima dele (0,03917) o recall já cai para 0,788. Por isso o valor registrado foi arredondado **para baixo** (0,038875). Se o negócio preferir recall (por exemplo, com analistas revisando alertas), este é o segundo ponto a oferecer. Ele **não** foi aplicado.
+
+### 4. Reprodutibilidade do `scripts/a8_campeao.py`
+
+- Rodado de novo com `random-forest-tuned random-forest`: limiar 0,468518, as mesmas métricas, e **`src/best_params.json`, `a8_01_limiar.png` e `a8_02_confusao_antes_depois.png` idênticos byte a byte** (sha256 iguais antes e depois).
+- O script **não tem aleatoriedade**: não treina nada e não usa semente. Ele lê o `holdout_scores.csv` de uma run já registrada e aplica funções determinísticas (`precision_recall_curve`, `choose_threshold`). A reprodutibilidade vem de ler sempre o mesmo artefato. **Atenção:** ele usa a run **mais recente** com aquele nome. Se o `tune random-forest` for rodado de novo, a run nova passa a ser a lida (o resultado seria igual se a busca chegasse à mesma configuração).
+- **Dois detalhes cosméticos na saída do terminal, sem efeito nos arquivos:** a linha "limiar (máx. F1) = 0.468518" deveria dizer "limiar publicado"; e a linha de referência "recall >= 0.7" mostra o ponto do limiar exato (precisão 0,95, recall 0,7308), não o do publicado. Não corrigi, porque a instrução era não alterar código nesta verificação.
+
+---
+
+## Passagem de bastão (fim da sessão 2)
+
+**Pronto:** protocolo sem vazamento (desenvolvimento / holdout / stream), A6 (9 variantes, notebook 03), diagnóstico estratificado × temporal × holdout, A7 (RF e MLP; TPE × Random Search), A8 (RF otimizada como `champion` v6, limiar 0,468518, stream PR-AUC 0,789). Comandos: `compare`, `diagnose`, `tune`, `final`, `stream_test` (`python -m src.train <comando>`), `scripts/a8_campeao.py`, `scripts/build_nb03.py`.
+
+**Falta (frente A)**
+
+| Tarefa | O que falta | Insumos prontos |
+|---|---|---|
+| **A9** | Curva de aprendizado da RF campeã (PR-AUC × tamanho do treino, no temporal) e o parágrafo de diagnóstico | Over/underfitting já discutido no notebook 03 (seção 8) e na S2.6; métricas `train_*` e `cv_temporal_train_*` no MLflow |
+| **A10** | `reports/resultados.md` com os números finais e o run de origem de cada um | Tabelas das S2.4–S2.7; todas as figuras em `reports/figs/` (`eda_*`, `val_*`, `cmp_*`, `opt_*`, `a8_*`) |
+| Notebook A7/A8 (opcional) | A7 e A8 estão documentadas aqui e nas figuras, não num notebook | `scripts/a8_campeao.py` e o MLflow |
+| `final` na DAG | A B6 deve trocar a tarefa `baseline` por `final` | O `final` leva ~12 min com 400 árvores (holdout + 5-fold estratificado + 5-fold temporal + treino final). Se pesar na DAG diária, a frente A pode criar um modo que só treina e registra |
+
+**Pendências das outras frentes**
+
+| Frente | Pendência |
+|---|---|
+| **B** | Simulador reiniciado não gera dados novos por horas (`tx_id` repetido + `ON CONFLICT DO NOTHING`). Ver a "Nota para a frente B" acima |
+| **B** | `FRAUD_THRESHOLD` padrão = **0.468518** no `docker-compose.yml` e no `.env.example` |
+| **B (B6)** | Trocar `baseline` por `final` na DAG (lê `src/best_params.json`; move o `champion` só para o campeão) |
+| **B/C** | `ruff check .` aponta 11 avisos em `api/`, `app/`, `embedded/`, `subscriber/` (`BLE001`, `S110`, `I001`) |
+| **C** | Dashboard e relatório: usar o limiar 0,468518 e as métricas do campeão (S2.7). Números para o relatório: S2.2 a S2.7 |
+| **README** | Conflito comum da porta 8080 (sessão 1, etapa 2) |
