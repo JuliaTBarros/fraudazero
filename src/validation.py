@@ -1,4 +1,10 @@
-"""Validação dos modelos: holdout temporal, k-fold estratificado e teste final no stream.
+"""Validação dos modelos: protocolo de avaliação em três conjuntos, sem vazamento.
+
+- Desenvolvimento = primeiros 80% (por Time) do train.csv. Stratified 5-fold e TODA otimização de
+  hiperparâmetros acontecem só aqui (`split_dev_holdout` + `cv_stratified`).
+- Holdout temporal = últimos 20% do train.csv. Compara modelos e escolhe o campeão e o limiar
+  (`holdout_temporal`: treina no desenvolvimento, valida no holdout).
+- stream.csv = teste final, usado UMA vez, só no campeão (`evaluate_on_stream`).
 
 Uso típico (A6/A7): passe um Pipeline NÃO treinado; cada função faz `clone` e treina do zero,
 então todo pré-processamento e reamostragem (SMOTE, undersampling) fica restrito aos dados de treino.
@@ -8,6 +14,7 @@ import time
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 from sklearn.base import clone
 from sklearn.metrics import (
@@ -15,11 +22,12 @@ from sklearn.metrics import (
     PrecisionRecallDisplay,
     average_precision_score,
     f1_score,
+    precision_recall_curve,
     precision_score,
     recall_score,
     roc_auc_score,
 )
-from sklearn.model_selection import StratifiedKFold
+from sklearn.model_selection import StratifiedKFold, TimeSeriesSplit
 
 from src.common import config
 from src.common.schema import FEATURES, TARGET
@@ -28,6 +36,30 @@ DATA = Path(config.DATA_DIR)
 TRAIN = DATA / "processed" / "train.csv"
 STREAM = DATA / "stream" / "stream.csv"
 SEED = 42
+
+# Estilo único das figuras (notebooks, MLflow e reports/figs): fundo claro, grade discreta, sem bordas extras.
+PLOT_STYLE = {
+    "figure.dpi": 110,
+    "savefig.dpi": 150,
+    "savefig.bbox": "tight",
+    "figure.facecolor": "#fcfcfb",
+    "axes.facecolor": "#fcfcfb",
+    "axes.edgecolor": "#c3c2b7",
+    "axes.labelcolor": "#52514e",
+    "axes.titlecolor": "#0b0b0b",
+    "xtick.color": "#52514e",
+    "ytick.color": "#52514e",
+    "text.color": "#0b0b0b",
+    "axes.grid": True,
+    "grid.color": "#e8e7e3",
+    "grid.linewidth": 0.8,
+    "axes.spines.top": False,
+    "axes.spines.right": False,
+    "font.size": 10,
+}
+plt.rcParams.update(PLOT_STYLE)
+# primeiros 80% do train.csv (por Time) = desenvolvimento; os 20% restantes = holdout temporal
+DEV_FRACTION = 0.8
 
 
 def load_train(dedupe=True):
@@ -56,6 +88,12 @@ def metrics(y_true, scores, threshold=0.5):
     }
 
 
+def split_dev_holdout(X, y, frac=DEV_FRACTION):
+    """Corte temporal: (X_dev, y_dev, X_hold, y_hold). Os dados já vêm em ordem de Time."""
+    cut = int(len(X) * frac)
+    return X.iloc[:cut], y.iloc[:cut], X.iloc[cut:], y.iloc[cut:]
+
+
 def _fit(model, X, y):
     start = time.perf_counter()
     fitted = clone(model).fit(X, y)
@@ -66,25 +104,27 @@ def _scores(model, X):
     return model.predict_proba(X)[:, 1]
 
 
-def holdout_temporal(model, X, y, frac=0.8, threshold=0.5):
-    """Treina nos primeiros `frac` (por Time) e valida no restante: simula prever o futuro com o passado."""
-    cut = int(len(X) * frac)
-    fitted, fit_s = _fit(model, X.iloc[:cut], y.iloc[:cut])
-    scores = _scores(fitted, X.iloc[cut:])
+def holdout_temporal(model, X, y, frac=DEV_FRACTION, threshold=0.5):
+    """Treina no desenvolvimento (passado) e valida no holdout (futuro). Recebe o train.csv inteiro."""
+    X_dev, y_dev, X_hold, y_hold = split_dev_holdout(X, y, frac)
+    fitted, fit_s = _fit(model, X_dev, y_dev)
+    start = time.perf_counter()
+    scores = _scores(fitted, X_hold)
+    predict_s = time.perf_counter() - start
     return {
-        "train": metrics(y.iloc[:cut], _scores(fitted, X.iloc[:cut]), threshold),
-        "valid": metrics(y.iloc[cut:], scores, threshold),
+        "train": metrics(y_dev, _scores(fitted, X_dev), threshold),
+        "valid": metrics(y_hold, scores, threshold),
         "fit_seconds": fit_s,
-        "y_valid": y.iloc[cut:].to_numpy(),
+        "predict_seconds": predict_s,
+        "y_valid": y_hold.to_numpy(),
         "scores_valid": scores,
+        "model": fitted,
     }
 
 
-def cv_stratified(model, X, y, k=5, threshold=0.5, seed=SEED):
-    """K-fold estratificado. Devolve um DataFrame com uma linha por fold (métricas de treino e validação)."""
+def _cv(model, X, y, splits, threshold):
     rows = []
-    folds = StratifiedKFold(n_splits=k, shuffle=True, random_state=seed)
-    for i, (tr, va) in enumerate(folds.split(X, y), start=1):
+    for i, (tr, va) in enumerate(splits, start=1):
         fitted, fit_s = _fit(model, X.iloc[tr], y.iloc[tr])
         train_m = metrics(y.iloc[tr], _scores(fitted, X.iloc[tr]), threshold)
         valid_m = metrics(y.iloc[va], _scores(fitted, X.iloc[va]), threshold)
@@ -96,6 +136,37 @@ def cv_stratified(model, X, y, k=5, threshold=0.5, seed=SEED):
     return pd.DataFrame(rows)
 
 
+def cv_stratified(model, X, y, k=5, threshold=0.5, seed=SEED):
+    """K-fold estratificado. Devolve um DataFrame com uma linha por fold (métricas de treino e validação).
+
+    Passe só o conjunto de DESENVOLVIMENTO (`split_dev_holdout`): o holdout não pode entrar nos folds.
+    """
+    folds = StratifiedKFold(n_splits=k, shuffle=True, random_state=seed)
+    return _cv(model, X, y, folds.split(X, y), threshold)
+
+
+def cv_temporal(model, X, y, k=5, threshold=0.5):
+    """Validação temporal (TimeSeriesSplit): cada split treina no passado e valida no bloco seguinte.
+
+    Mesmo formato do `cv_stratified`. Passe só o DESENVOLVIMENTO, em ordem de Time.
+    """
+    return _cv(model, X, y, TimeSeriesSplit(n_splits=k).split(X), threshold)
+
+
+def bootstrap_ci(y_true, scores, n=1000, seed=SEED, alpha=0.05):
+    """IC (1 - alpha) da PR-AUC por bootstrap das linhas. Devolve (baixo, alto, amostras)."""
+    y_true, scores = np.asarray(y_true), np.asarray(scores)
+    rng = np.random.RandomState(seed)
+    stats = []
+    for _ in range(n):
+        idx = rng.randint(0, len(y_true), len(y_true))
+        if y_true[idx].any():
+            stats.append(average_precision_score(y_true[idx], scores[idx]))
+    stats = np.array(stats)
+    lo, hi = np.quantile(stats, [alpha / 2, 1 - alpha / 2])
+    return float(lo), float(hi), stats
+
+
 def summarize_cv(folds):
     """{coluna_mean, coluna_std} para cada métrica dos folds (formato pronto para mlflow.log_metrics)."""
     out = {}
@@ -103,6 +174,14 @@ def summarize_cv(folds):
         out[f"cv_{col}_mean"] = float(folds[col].mean())
         out[f"cv_{col}_std"] = float(folds[col].std())
     return out
+
+
+def choose_threshold(y_true, scores):
+    """Limiar que maximiza o F1 da classe fraude (critério da A8). Devolve (limiar, precisão, recall, F1)."""
+    p, r, t = precision_recall_curve(y_true, scores)
+    f1 = 2 * p[:-1] * r[:-1] / np.clip(p[:-1] + r[:-1], 1e-12, None)
+    i = int(np.argmax(f1))
+    return float(t[i]), float(p[i]), float(r[i]), float(f1[i])
 
 
 def evaluate_on_stream(fitted_model, threshold=0.5):
